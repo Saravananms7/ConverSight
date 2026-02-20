@@ -1,0 +1,71 @@
+Agent:
+Good afternoon, thank you for calling Horizon Bank support. My name is Anjali. How may I assist you today?
+
+Customer:
+Yeah hi… I just got a message saying my card was used for some purchase and I did NOT do that.
+
+Agent:
+I’m sorry to hear that. I’ll help you with that. May I know your name please?
+
+Customer:
+Rahul Menon.
+
+Agent:
+Thank you, Mr. Rahul. Can you confirm the last four digits of your card?
+
+Customer:
+4482.
+
+Agent:
+Thank you. Please allow me a moment while I check the transaction details.
+
+Customer:
+This is really worrying… it shows some online shopping site and I’ve never used that site.
+
+Agent:
+I understand your concern. I can see a transaction of ₹7,850 from an e-commerce merchant made about 20 minutes ago. Can you confirm if this was you?
+
+Customer:
+No! That’s exactly what I’m saying. I didn’t buy anything.
+
+Agent:
+Alright. I recommend we immediately block your card to prevent further usage. Should I proceed?
+
+Customer:
+Yes obviously, block it right now.
+
+Agent:
+Done. Your card has been blocked. No further transactions can occur.
+
+Customer:
+Okay… but what about my money?
+
+Agent:
+We will raise a dispute request for the transaction. Our investigation team will review it.
+
+Customer:
+How long is that going to take?
+
+Agent:
+Typically 5–7 working days.
+
+Customer:
+That’s too long. I need that money.
+
+Agent:
+I understand. While I cannot guarantee the outcome, most genuine fraud cases are resolved in the customer’s favor.
+
+Customer:
+Hmm… alright. Please make sure this is handled quickly.
+
+Agent:
+Certainly. I’ve submitted the complaint. You will receive updates via SMS.
+
+Customer:
+Fine. Thanks.
+
+Agent:
+Is there anything else I can help you with today?
+
+Customer:
+No.

@@ -1,0 +1,41 @@
+Agent:
+வணக்கம், Horizon Bank customer support. நான் Priya பேசுகிறேன். எப்படி உதவலாம்?
+
+Customer:
+வணக்கம்… என் card-ல ஒரு transaction நடந்துருக்கு. நான் செய்யல.
+
+Agent:
+சரி sir, கவலைப்படாதீங்க. Transaction amount சொல்ல முடியுமா?
+
+Customer:
+ரூ. 4,500. Online purchase மாதிரி காட்டுது.
+
+Agent:
+சரி. இது unauthorized transaction ஆக இருக்கலாம். Card block செய்யட்டுமா?
+
+Customer:
+ஆமாம், உடனே block பண்ணுங்க. இன்னும் use ஆகக்கூடாது.
+
+Agent:
+சரி sir, உங்கள் card இப்போ block செய்யப்பட்டது.
+
+Customer:
+சரி… ஆனால் என் பணம் என்ன ஆகும்?
+
+Agent:
+Dispute request raise பண்ணலாம். Investigation முடிந்த பிறகு update வரும்.
+
+Customer:
+அதுக்கு எவ்வளவு நாள் ஆகும்?
+
+Agent:
+சாதாரணமாக 5 முதல் 7 working days ஆகும்.
+
+Customer:
+சரி… தயவு செய்து சீக்கிரம் resolve பண்ணுங்க.
+
+Agent:
+நிச்சயம் sir. Complaint பதிவு செய்யப்பட்டது.
+
+Customer:
+Thanks.

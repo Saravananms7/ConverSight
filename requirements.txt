@@ -1,0 +1,29 @@
+# CoverSight - Audio to Text + Text to Speech
+# Transight Hackathon
+
+fastapi==0.109.2
+uvicorn[standard]==0.27.1
+python-multipart==0.0.9
+pydantic==2.6.1
+pydantic-settings==2.1.0
+
+# Transcription (Deepgram)
+deepgram-sdk>=3.0.0
+httpx>=0.27.0
+
+# Text-to-Speech (Google Cloud)
+google-cloud-texttospeech>=2.14.0
+requests>=2.31.0
+
+# Whisper (OpenAI API)
+openai>=1.0.0
+
+# Whisper (local) - for transcription + language detection
+openai-whisper>=20231117
+
+# Language detection (for OpenAI Whisper API fallback - no language in response)
+langdetect>=1.0.9
+
+# LLM Analysis (Gemini) + Translation
+google-generativeai>=0.8.0
+google-genai>=1.0.0
