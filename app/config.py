@@ -3,7 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
@@ -21,9 +21,14 @@ class Settings(BaseSettings):
     # Whisper (OpenAI API)
     openai_api_key: str = ""
 
-    class Config:
-        env_file = str(ENV_FILE)
-        env_file_encoding = "utf-8"
+    # Policy embeddings: local file storage
+    policy_storage_path: str = "data/policy_embeddings.json"
+
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 @lru_cache

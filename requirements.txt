@@ -27,3 +27,7 @@ langdetect>=1.0.9
 # LLM Analysis (Gemini) + Translation
 google-generativeai>=0.8.0
 google-genai>=1.0.0
+
+# Policy RAG (embeddings + vector search)
+numpy>=1.24.0
+faiss-cpu>=1.7.4

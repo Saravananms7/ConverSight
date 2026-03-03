@@ -24,3 +24,18 @@ Thumbs.db
 
 # Temp downloads
 tmp/
+
+# Local policy embeddings
+data/
+
+.env
+venv/
+__pycache__/
+
+audio/
+*.mpeg
+*.mp3
+*.mp4
+*.wav
+
+transcript*.txt

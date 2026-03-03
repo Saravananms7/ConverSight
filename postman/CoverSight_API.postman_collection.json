@@ -1,1 +1,152 @@
-{"info":{"name":"CoverSight API","description":"CoverSight - Audio to Text (Deepgram) + Text Analysis. All endpoints return JSON except /synthesize/speech (returns audio).","schema":"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},"variable":[{"key":"base_url","value":"http://localhost:8000"},{"key":"api_key","value":""}],"item":[{"name":"Health & Info","item":[{"name":"GET / - Service info","request":{"method":"GET","header":[],"url":"{{base_url}}/","description":"Returns service info and available endpoints."}},{"name":"GET /health","request":{"method":"GET","header":[],"url":"{{base_url}}/health","description":"Health check. Returns {\"status\": \"healthy\"}"}}]},{"name":"Transcription","item":[{"name":"POST /transcribe/audio","request":{"method":"POST","header":[{"key":"x-api-key","value":"{{api_key}}","disabled":true}],"body":{"mode":"formdata","formdata":[{"key":"file","type":"file","src":[]}]},"url":"{{base_url}}/transcribe/audio","description":"Upload audio file. Returns: transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities."}}]},{"name":"Text Analysis (JSON body)","item":[{"name":"POST /detect-topics","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"x-api-key","value":"{{api_key}}","disabled":true}],"body":{"mode":"raw","raw":"{\n  \"text\": \"Agent: Good afternoon. Customer: I need help with my card - there was a fraudulent transaction.\"\n}"},"url":"{{base_url}}/detect-topics","description":"Analyze text. Returns: transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities."}}]},{"name":"Text Analysis (File upload)","item":[{"name":"POST /analyze/text","request":{"method":"POST","header":[{"key":"x-api-key","value":"{{api_key}}","disabled":true}],"body":{"mode":"formdata","formdata":[{"key":"file","type":"file","src":[]}]},"url":"{{base_url}}/analyze/text","description":"Upload .txt file. Returns: transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities."}}]}]}
+{
+  "info": {
+    "name": "CoverSight API",
+    "description": "CoverSight - Audio to Text (Deepgram) + Text to Speech (Google Cloud) + Policy RAG. All endpoints return JSON except /synthesize/speech (returns audio).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:8000"},
+    {"key": "api_key", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Health & Info",
+      "item": [
+        {
+          "name": "GET / - Service info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/",
+            "description": "Returns service info and available endpoints."
+          }
+        },
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/health",
+            "description": "Health check. Returns {\"status\": \"healthy\"}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Policy",
+      "item": [
+        {
+          "name": "POST /policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "x-api-key", "value": "{{api_key}}", "disabled": true}
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "file", "type": "file", "src": [], "description": "Policy .txt file (optional if policy_text provided)"},
+                {"key": "policy_text", "type": "text", "src": [], "description": "Or paste policy text directly (optional if file provided)"}
+              ]
+            },
+            "url": "{{base_url}}/policy",
+            "description": "Upload policy document. Generates embeddings and stores in Supabase (or memory). Required before transcribe/analyze can run policy RAG. Provide either file or policy_text."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transcription",
+      "item": [
+        {
+          "name": "POST /transcribe/audio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "x-api-key", "value": "{{api_key}}", "disabled": true}
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "file", "type": "file", "src": [], "description": "Audio file (mp3, wav, m4a, etc.)"},
+                {"key": "provider", "type": "text", "src": [], "value": "deepgram", "description": "deepgram | whisper | whisper-gemini"},
+                {"key": "client_config", "type": "text", "src": [], "description": "Optional JSON: {business_domain, products_or_services, policies_or_rules, risk_or_compliance_triggers}"}
+              ]
+            },
+            "url": "{{base_url}}/transcribe/audio",
+            "description": "Upload audio file. Returns: transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities, policy_violation_report (if policy loaded), criteria_match_assessment (if client_config provided)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Text Analysis (JSON body)",
+      "item": [
+        {
+          "name": "POST /detect-topics",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "x-api-key", "value": "{{api_key}}", "disabled": true}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Agent: Good afternoon. Customer: I need help with my card - there was a fraudulent transaction.\",\n  \"client_config\": {\n    \"business_domain\": \"telecom\",\n    \"products_or_services\": [\"mobile plans\", \"cards\"]\n  }\n}"
+            },
+            "url": "{{base_url}}/detect-topics",
+            "description": "Analyze text. Returns: transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities, policy_violation_report (if policy loaded), criteria_match_assessment (if client_config provided)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Text Analysis (File upload)",
+      "item": [
+        {
+          "name": "POST /analyze/text",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "x-api-key", "value": "{{api_key}}", "disabled": true}
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "file", "type": "file", "src": [], "description": "Text file (.txt)"},
+                {"key": "client_config", "type": "text", "src": [], "description": "Optional JSON: {business_domain, products_or_services, policies_or_rules, risk_or_compliance_triggers}"}
+              ]
+            },
+            "url": "{{base_url}}/analyze/text",
+            "description": "Upload .txt file. Returns: transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities, policy_violation_report (if policy loaded), criteria_match_assessment (if client_config provided)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Text to Speech",
+      "item": [
+        {
+          "name": "POST /synthesize/speech",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "x-api-key", "value": "{{api_key}}", "disabled": true}
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "text", "type": "text", "src": [], "value": "Hello, this is a test.", "description": "Text to convert to speech"},
+                {"key": "language_code", "type": "text", "src": [], "value": "en-US", "description": "Language code (e.g. en-US)"},
+                {"key": "voice_name", "type": "text", "src": [], "description": "Optional voice name"},
+                {"key": "audio_encoding", "type": "text", "src": [], "value": "MP3", "description": "MP3 | LINEAR16 | MP3_64_KBPS"}
+              ]
+            },
+            "url": "{{base_url}}/synthesize/speech",
+            "description": "Convert text to speech. Returns MP3 audio file (or WAV if LINEAR16). Requires GOOGLE_APPLICATION_CREDENTIALS."
+          }
+        }
+      ]
+    }
+  ]
+}

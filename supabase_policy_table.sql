@@ -1,0 +1,3 @@
+-- Policy embeddings are now stored locally (data/policy_embeddings.json).
+-- Supabase is no longer used for policy storage.
+-- This file is kept for reference only.

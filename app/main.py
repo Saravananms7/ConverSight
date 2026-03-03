@@ -1,4 +1,5 @@
 """CoverSight - Audio to Text (Deepgram) + Text to Speech (Google Cloud)."""
+import json
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -17,6 +18,7 @@ from app.services.transcription_service import (
 )
 from app.services.structured_analysis import extract_structured_analysis
 from app.services.tts_service import synthesize_speech
+from app.services.policy_service import store_policy_in_supabase, run_policy_rag_safe
 
 app = FastAPI(
     title="CoverSight",
@@ -30,60 +32,138 @@ ALLOWED_EXT = {".mp3", ".mpeg", ".wav", ".m4a", ".ogg", ".webm", ".flac", ".mp4"
 ALLOWED_TEXT_EXT = {".txt"}
 
 
+def _parse_client_config(config: str | dict | None) -> dict | None:
+    """Parse client_config from JSON string or dict. Returns None if invalid or empty."""
+    if config is None:
+        return None
+    if isinstance(config, dict):
+        return config if config else None
+    if isinstance(config, str) and config.strip():
+        try:
+            data = json.loads(config)
+            return data if isinstance(data, dict) else None
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def _build_client_context_str(config: dict) -> str:
+    """Build context string from client config for prepending to transcript."""
+    parts = ["Client context (assess whether transcript matches these criteria):"]
+    if config.get("business_domain"):
+        parts.append(f"- Business domain: {config['business_domain']}")
+    if config.get("products_or_services"):
+        p = config["products_or_services"]
+        val = ", ".join(p) if isinstance(p, list) else str(p)
+        parts.append(f"- Products/services: {val}")
+    if config.get("policies_or_rules"):
+        p = config["policies_or_rules"]
+        val = "; ".join(p) if isinstance(p, list) else str(p)
+        parts.append(f"- Policies/rules: {val}")
+    if config.get("risk_or_compliance_triggers"):
+        r = config["risk_or_compliance_triggers"]
+        val = ", ".join(r) if isinstance(r, list) else str(r)
+        parts.append(f"- Risk/compliance triggers: {val}")
+    return "\n".join(parts)
+
+
+def _text_with_context(transcript: str, client_config: dict | None) -> str:
+    """Prepend client context to transcript for Deepgram analysis."""
+    if not client_config:
+        return transcript
+    ctx = _build_client_context_str(client_config)
+    return f"{ctx}\n\nTranscript:\n{transcript}"
+
+
 def _build_analysis_response(
     transcript: str,
     structured: dict,
     detected_lang: str,
     translated: str | None = None,
+    client_config: dict | None = None,
+    policy_rag_report: list | None = None,
     **extra,
 ) -> dict:
-    """Build unified response format for transcribe and text analysis."""
-    base = {
+    """Build clean unified response for transcribe and text analysis."""
+    lang_name = lang_code_to_name(detected_lang) or detected_lang or "English"
+
+    # Policy violation: extract violations only
+    policy_violation = None
+    if policy_rag_report is not None:
+        def _is_violation(analysis: dict) -> bool:
+            v = analysis.get("violation")
+            if v is True:
+                return True
+            if isinstance(v, str) and v.lower() in ("true", "yes", "1"):
+                return True
+            return False
+
+        violations = [
+            {
+                "segment": r["transcript_chunk"],
+                "reason": r["analysis"].get("reason", ""),
+                "violated_policy": r["analysis"].get("violated_policy_excerpt", ""),
+            }
+            for r in policy_rag_report
+            if _is_violation(r.get("analysis", {}))
+        ]
+        policy_violation = {
+            "has_violations": len(violations) > 0,
+            "count": len(violations),
+            "violations": violations,
+        }
+
+    return {
         "transcript": transcript,
-        "detected_language": lang_code_to_name(detected_lang) or detected_lang or "English",
-        "conversation_summary": structured["conversation_summary"],
-        "overall_sentiment": structured["detected_sentiment"],
-        "primary_customer_intents": structured["customer_intents"],
-        "key_topics": structured["key_topics"],
-        "entities": structured["entities"],
-        **extra,
+        "translation": translated if translated else None,
+        "detected_language": lang_name,
+        "topics": structured.get("key_topics") or ["Not specified"],
+        "sentiment": structured.get("detected_sentiment") or "Not specified",
+        "intent": structured.get("customer_intents") or ["Not specified"],
+        "policy_violation": policy_violation,
+        "summary": structured.get("conversation_summary") or "Not specified",
     }
-    if translated is not None:
-        base["translated_transcript"] = translated
-    return base
 
 
-def _analyze_text_and_build_response(text: str, filename: str | None = None) -> dict:
+def _run_rag_and_build_response(
+    text: str,
+    filename: str | None = None,
+    client_config: dict | None = None,
+) -> dict:
     """Analyze text and return unified format (same as transcribe/audio)."""
     text = (text or "").strip()
     if not text:
-        out = {
+        return {
             "transcript": "",
+            "translation": None,
             "detected_language": "Not specified",
-            "conversation_summary": "Not specified",
-            "overall_sentiment": "Not specified",
-            "primary_customer_intents": ["Not specified"],
-            "key_topics": ["Not specified"],
-            "entities": [],
+            "topics": ["Not specified"],
+            "sentiment": "Not specified",
+            "intent": ["Not specified"],
+            "policy_violation": None,
+            "summary": "Not specified",
         }
-        if filename:
-            out["filename"] = filename
-        return out
     detected_lang = detect_language_from_text(text)
     is_english = not detected_lang or detected_lang.startswith("en")
 
+    policy_rag_report = run_policy_rag_safe(text)
+
     if not is_english:
         translated = translate_to_english(text, detected_lang)
-        result = analyze_text(translated)
+        text_for_analysis = _text_with_context(translated, client_config)
+        result = analyze_text(text_for_analysis)
         structured = extract_structured_analysis(translated, result.to_dict())
-        out = _build_analysis_response(text, structured, detected_lang, translated=translated)
-    else:
-        result = analyze_text(text)
-        structured = extract_structured_analysis(text, result.to_dict())
-        out = _build_analysis_response(text, structured, detected_lang)
-    if filename:
-        out["filename"] = filename
-    return out
+        return _build_analysis_response(
+            text, structured, detected_lang, translated=translated,
+            client_config=client_config, policy_rag_report=policy_rag_report,
+        )
+    text_for_analysis = _text_with_context(text, client_config)
+    result = analyze_text(text_for_analysis)
+    structured = extract_structured_analysis(text, result.to_dict())
+    return _build_analysis_response(
+        text, structured, detected_lang,
+        client_config=client_config, policy_rag_report=policy_rag_report,
+    )
 
 
 async def verify_api_key(x_api_key: str | None = Header(None)):
@@ -102,6 +182,7 @@ async def root():
         "description": "Audio to Text (Deepgram) + Text to Speech (Google Cloud)",
         "docs": "/docs",
         "endpoints": {
+            "policy": "POST /policy",
             "transcribe": "POST /transcribe/audio",
             "synthesize": "POST /synthesize/speech",
             "detect_topics": "POST /detect-topics",
@@ -116,13 +197,54 @@ async def health():
 
 
 @app.post(
+    "/policy",
+    summary="Upload policy document",
+    description="Upload policy text. Generates embeddings and stores locally (data/policy_embeddings.json). Required before transcribe/analyze can run policy RAG.",
+)
+async def upload_policy(
+    file: UploadFile = File(None, description="Policy text file (.txt)"),
+    policy_text: Optional[str] = Form(None, description="Or paste policy text directly"),
+    _: bool = Depends(verify_api_key),
+):
+    """Store policy chunks and embeddings for RAG."""
+    text = None
+    if file and file.filename:
+        suffix = Path(file.filename or "").suffix.lower()
+        if suffix and suffix != ".txt":
+            raise HTTPException(status_code=400, detail="Policy file must be .txt")
+        contents = await file.read()
+        try:
+            text = contents.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="File must be valid UTF-8")
+    elif policy_text:
+        text = policy_text
+
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="Provide policy via file upload or policy_text form field")
+
+    try:
+        result = store_policy_in_supabase(text.strip())
+        log_msg = (
+            f"Policy embeddings created: {result['chunks_count']} chunks "
+            f"(storage: {result['storage']})"
+        )
+        return {"message": "Policy stored successfully", "log": log_msg, **result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Policy storage failed: {str(e)}")
+
+
+@app.post(
     "/transcribe/audio",
     summary="Transcribe audio to text",
-    description="Upload an audio file. Use provider: deepgram (default), whisper (OpenAI API), or whisper-gemini (local Whisper + Gemini translate + Deepgram analyze).",
+    description="Upload an audio file. Optional client_config (JSON): business_domain, products_or_services, policies_or_rules, risk_or_compliance_triggers. Context is prepended to transcript before Deepgram analysis; LLM assesses if criteria match.",
 )
 async def transcribe(
     file: UploadFile = File(..., description="Audio file (mp3, wav, m4a, etc.)"),
-    provider: str = "deepgram",
+    provider: str = Form("deepgram"),
+    client_config: Optional[str] = Form(None, description="JSON: {business_domain, products_or_services, policies_or_rules, risk_or_compliance_triggers}"),
     _: bool = Depends(verify_api_key),
 ):
     suffix = Path(file.filename or "").suffix.lower()
@@ -138,6 +260,7 @@ async def transcribe(
         tmp_path = Path(tmp.name)
 
     try:
+        cfg = _parse_client_config(client_config)
         if provider.lower() in ("whisper", "whisper-gemini"):
             result = transcribe_audio_provider(tmp_path, provider)
         else:
@@ -149,16 +272,26 @@ async def transcribe(
 
         if not is_english and transcript.strip():
             translated = translate_to_english(transcript, detected_lang)
-            analysis_result = analyze_text(translated)
+            policy_rag_report = run_policy_rag_safe(translated)
+            text_for_analysis = _text_with_context(translated, cfg)
+            analysis_result = analyze_text(text_for_analysis)
             structured = extract_structured_analysis(translated, analysis_result.to_dict())
             return _build_analysis_response(
                 transcript, structured, detected_lang, translated=translated,
+                client_config=cfg, policy_rag_report=policy_rag_report,
                 filename=file.filename, provider=provider,
             )
-        structured = extract_structured_analysis(transcript, d)
+        policy_rag_report = run_policy_rag_safe(transcript)
+        if cfg:
+            text_for_analysis = _text_with_context(transcript, cfg)
+            analysis_result = analyze_text(text_for_analysis)
+            structured = extract_structured_analysis(transcript, analysis_result.to_dict())
+        else:
+            structured = extract_structured_analysis(transcript, d)
         return _build_analysis_response(
             transcript, structured,
             d.get("detected_language") or "en",
+            client_config=cfg, policy_rag_report=policy_rag_report,
             filename=file.filename, provider=provider,
         )
     except ValueError as e:
@@ -169,60 +302,34 @@ async def transcribe(
         tmp_path.unlink(missing_ok=True)
 
 
-@app.post(
-    "/synthesize/speech",
-    summary="Text to Speech",
-    description="Convert text to speech using Google Cloud TTS. Returns MP3 audio.",
-)
-async def synthesize(
-    text: str = Form(..., description="Text to convert to speech"),
-    language_code: str = Form("en-US", description="Language code (e.g. en-US)"),
-    voice_name: Optional[str] = Form(None, description="Voice name (optional)"),
-    audio_encoding: str = Form("MP3", description="MP3, LINEAR16, MP3_64_KBPS"),
-    _: bool = Depends(verify_api_key),
-):
-    """Convert text to speech and return audio file."""
-    if not text.strip():
-        raise HTTPException(status_code=400, detail="Text cannot be empty")
-
-    try:
-        audio_bytes = synthesize_speech(
-            text=text,
-            language_code=language_code,
-            voice_name=voice_name,
-            audio_encoding=audio_encoding,
-        )
-        media_type = "audio/mpeg" if audio_encoding.upper() == "MP3" else "audio/wav"
-        return Response(
-            content=audio_bytes,
-            media_type=media_type,
-            headers={"Content-Disposition": "attachment; filename=speech.mp3"},
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"TTS failed: {str(e)}. Ensure GOOGLE_APPLICATION_CREDENTIALS is set.",
-        )
-
 
 @app.post(
     "/detect-topics",
     summary="Analyze text (full results)",
-    description="Analyze text/transcript and return same format as audio (transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities). Translates non-English text via Gemini.",
+    description="Analyze text/transcript. Optional client_config (JSON) for domain-specific analysis and criteria match assessment.",
 )
 async def detect_topics(
-    body: dict = Body(..., example={"text": "Can I upgrade my phone? I need a new battery."}),
+    body: dict = Body(
+        ...,
+        example={
+            "text": "Can I upgrade my phone? I need a new battery.",
+            "client_config": {"business_domain": "telecom", "products_or_services": ["mobile plans"]},
+        },
+    ),
     _: bool = Depends(verify_api_key),
 ):
     """Analyze text and return same format as transcribe/audio."""
-    text = body.get("text") if isinstance(body, dict) else None
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="Request body must be JSON object")
+    text = body.get("text")
     if text is None:
         raise HTTPException(status_code=400, detail="Missing 'text' field in request body")
     if not isinstance(text, str):
         raise HTTPException(status_code=400, detail="'text' must be a string")
 
     try:
-        return _analyze_text_and_build_response(text)
+        cfg = _parse_client_config(body.get("client_config"))
+        return _run_rag_and_build_response(text, client_config=cfg)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
@@ -232,10 +339,11 @@ async def detect_topics(
 @app.post(
     "/analyze/text",
     summary="Analyze text file",
-    description="Upload a text file (e.g. chat transcript). Returns same format as audio (transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities). Translates non-English via Gemini.",
+    description="Upload a text file. Optional client_config (JSON form field) for domain-specific analysis and criteria match assessment.",
 )
 async def analyze_text_file(
     file: UploadFile = File(..., description="Text file (.txt)"),
+    client_config: Optional[str] = Form(None, description="JSON: {business_domain, products_or_services, policies_or_rules, risk_or_compliance_triggers}"),
     _: bool = Depends(verify_api_key),
 ):
     """Analyze a text file and return same format as transcribe/audio."""
@@ -253,7 +361,8 @@ async def analyze_text_file(
         raise HTTPException(status_code=400, detail="File must be valid UTF-8 text")
 
     try:
-        return _analyze_text_and_build_response(text, filename=file.filename)
+        cfg = _parse_client_config(client_config)
+        return _run_rag_and_build_response(text, filename=file.filename, client_config=cfg)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:

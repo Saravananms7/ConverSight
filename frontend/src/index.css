@@ -1,0 +1,101 @@
+:root {
+  --bg-primary: #0f172a;
+  --bg-secondary: #0b1120;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger: #ef4444;
+  --success: #10b981;
+  
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(148, 163, 184, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.dashboard {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--glass-border);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 2rem;
+}
+
+.nav-item {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.nav-item.active {
+  background-color: var(--accent);
+}
+
+.content {
+  flex: 1;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+header h1 { 
+  font-size: 2rem; 
+  font-weight: 700; 
+  margin-bottom: 0.5rem;
+}
+
+header p { 
+  color: var(--text-secondary); 
+  font-size: 1.1rem;
+}
+
+h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; }
+
+/* Glassmorphism Classes */
+.feature-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.file-dropzone:hover {
+  border-color: var(--accent) !important;
+  background-color: rgba(59, 130, 246, 0.05);
+}

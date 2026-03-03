@@ -107,3 +107,58 @@ def _list_entities(v: Any) -> List[Dict[str, str]]:
         if isinstance(item, dict) and "type" in item and "value" in item:
             out.append({"type": str(item["type"]), "value": str(item["value"])})
     return out
+
+
+CRITERIA_MATCH_PROMPT = """Given this client configuration and transcript, assess whether the conversation matches the criteria.
+
+Client configuration:
+{context}
+
+Transcript:
+---
+{transcript}
+---
+
+Return a JSON object:
+{{
+  "criteria_matches": true or false,
+  "explanation": "Brief explanation of why it matches or does not match the business domain, products, policies, and risk triggers."
+}}
+
+Return ONLY valid JSON, no markdown."""
+
+
+def assess_criteria_match(transcript: str, context_str: str) -> dict:
+    """
+    Use LLM to assess if transcript matches client criteria.
+    Returns {criteria_matches: bool, explanation: str} or defaults if Gemini unavailable.
+    """
+    defaults = {"criteria_matches": None, "explanation": "Not assessed (GOOGLE_API_KEY not set)"}
+    settings = get_settings()
+    if not settings.google_api_key:
+        return defaults
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=settings.google_api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = CRITERIA_MATCH_PROMPT.format(
+            context=context_str,
+            transcript=transcript[:12000],
+        )
+        response = model.generate_content(prompt)
+        text = (response.text or "").strip()
+        if "```json" in text:
+            text = re.sub(r"^```json\s*", "", text)
+            text = re.sub(r"\s*```\s*$", "", text)
+        elif "```" in text:
+            text = re.sub(r"^```\w*\s*", "", text)
+            text = re.sub(r"\s*```\s*$", "")
+
+        data = json.loads(text)
+        return {
+            "criteria_matches": bool(data.get("criteria_matches", False)),
+            "explanation": _str(data.get("explanation")) or "No explanation",
+        }
+    except Exception:
+        return defaults

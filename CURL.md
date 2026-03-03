@@ -46,11 +46,11 @@ curl -X POST http://localhost:8000/transcribe/audio -F "file=@recording.wav"
 curl -X POST "http://localhost:8000/transcribe/audio?provider=whisper-gemini" -F "file=@recording.wav"
 ```
 
-### POST /upload/audio
-Upload audio to Supabase Storage, get public URL.
+### POST /policy
+Upload policy text. Generates embeddings and stores in Supabase bucket (or memory).
 ```bash
-curl -X POST http://localhost:8000/upload/audio \
-  -F "file=@recording.mp3"
+curl -X POST http://localhost:8000/policy -F "file=@policy.txt"
+# Or: curl -X POST http://localhost:8000/policy -F "policy_text=Your policy text here."
 ```
 
 ### POST /synthesize/speech
@@ -91,7 +91,8 @@ curl -X POST http://localhost:8000/detect-topics \
 |----------|--------|------|---------|
 | `/` | GET | - | Service info (JSON) |
 | `/health` | GET | - | `{"status": "healthy"}` |
-| `/transcribe/audio` | POST | form-data: `file` | transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities |
+| `/policy` | POST | form-data: `file` or `policy_text` | Policy stored (embeddings) |
+| `/transcribe/audio` | POST | form-data: `file`, `provider`, `client_config` | transcript, analysis, policy_violation_report |
 | `/synthesize/speech` | POST | form-data: `text`, `language_code`, etc. | MP3 audio (binary) |
-| `/detect-topics` | POST | JSON: `{text}` | transcript, detected_language, conversation_summary, overall_sentiment, primary_customer_intents, key_topics, entities |
-| `/analyze/text` | POST | form-data: `file` (.txt) | Same as detect-topics |
+| `/detect-topics` | POST | JSON: `{text, client_config?}` | Same as transcribe |
+| `/analyze/text` | POST | form-data: `file` (.txt), `client_config` | Same as transcribe |

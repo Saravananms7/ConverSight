@@ -34,13 +34,27 @@ GOOGLE_API_KEY=your_google_api_key
 
 ---
 
-## Run
+## Run the Project
 
+The project consists of a FastAPI backend and a React (Vite) frontend. You will need two terminal windows to run both simultaneously.
+
+### 1. Start the Backend
+Open a terminal and run the following commands:
 ```powershell
+cd d:\VAJRA\CoverSight
+.\venv\Scripts\Activate.ps1
 python run.py
 ```
+The backend API and docs will be available at http://localhost:8000/docs.
 
-API docs: http://localhost:8000/docs
+### 2. Start the Frontend
+Open a **new** terminal window and run:
+```powershell
+cd d:\VAJRA\CoverSight\frontend
+npm install   # (only needed the first time)
+npm run dev
+```
+The frontend application will be available at the local URL provided by Vite (usually http://localhost:5173).
 
 ---
 
@@ -84,3 +98,37 @@ python scripts\test_audio.py
 ```
 
 Or use Swagger UI at http://localhost:8000/docs → **POST /transcribe/audio**.
+
+
+#Policy Checking
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 1. POST /policy                                                          │
+│    policy.txt → chunks → embeddings → Supabase bucket (or memory)        │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 2. POST /transcribe/audio  OR  POST /analyze/text  OR  POST /detect-topics│
+│    Audio/Text → transcript                                               │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 3. Policy RAG (if policy loaded)                                          │
+│    transcript chunks → embed → FAISS search → top-k policy chunks          │
+│    → LLM violation check per chunk → policy_violation_report              │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 4. Deepgram + structured analysis                                         │
+│    transcript → summary, sentiment, intents, topics, entities            │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ 5. Response                                                               │
+│    transcript, summary, sentiment, intents, topics, entities,             │
+│    policy_violation_report, criteria_match_assessment (if applicable)    │
+└─────────────────────────────────────────────────────────────────────────┘
